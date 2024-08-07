@@ -10,12 +10,14 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.messages import HumanMessage
 import io
+import os
+import requests
 
 app = FastAPI()
 
 # Load the language model
 local_llm = 'llama3'
-llm = ChatOllama(model=local_llm, temperature=0)
+llm = ChatOllama(model=local_llm, temperature=0, base_url="http://host.docker.internal:11434")
 
 # Define the QA prompt template
 qa_system_prompt = """system You are an assistant for question-answering tasks. Make it concise and in tabular form.
@@ -40,6 +42,11 @@ class QueryModel(BaseModel):
     question: str
     image: Optional[UploadFile] = None
 
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+@app.get("/")
+def read_root():
+    response = requests.get(OLLAMA_URL)
+    return {"ollama_response": response.json()}
 @app.post("/analyze-image/")
 async def analyze_image(question: str = Form(...), file: UploadFile = File(...)):
     try:
