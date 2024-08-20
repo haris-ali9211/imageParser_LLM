@@ -9,19 +9,39 @@ from langchain_community.chat_models import ChatOllama
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.messages import HumanMessage
+from fastapi.middleware.cors import CORSMiddleware
 import io
 import os
 import requests
 
 app = FastAPI()
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Load the language model
-local_llm = 'llama3'
-host_ip = os.environ.get('HOST_IP', 'host.docker.internal')
-llm = ChatOllama(model=local_llm, temperature=0, base_url=f"http://{host_ip}:11434")
+# local_llm = 'gemma'
+# local_llm = 'llama3'
+local_llm = 'llama3.1'
+# local_llm = 'mistral'
+
+# --------linus
+# host_ip = os.environ.get('HOST_IP', 'host.docker.internal')
+# llm = ChatOllama(model=local_llm, temperature=0, base_url=f"http://{host_ip}:11434")
+# llm = ChatOllama(model=local_llm, temperature=0)
+
+# --------mac
+# Load the language model
+llm = ChatOllama(model=local_llm, temperature=0, base_url="http://host.docker.internal:11434")
 
 # Define the QA prompt template
-qa_system_prompt = """system You are an assistant for question-answering tasks. Make it concise and in tabular form.
+qa_system_prompt = """You're a friendly expert in math and finance. Given the context, answer the question, and provide a clear, brief explanation afterward.
 Question: {input}
 Context: {context}
 Answer: assistant"""
@@ -56,7 +76,7 @@ async def analyze_image(question: str = Form(...), file: UploadFile = File(...))
         context_document = Document(page_content=extracted_text)
 
         # Ask the question
-        ai_msg_1 = question_answer_chain.invoke({"input": question, "chat_history": chat_history, "context": [context_document]})
+        ai_msg_1 = question_answer_chain.invoke({"input": question, "chat_history": [], "context": [context_document]})
         chat_history.extend([HumanMessage(content=question), ai_msg_1])
 
         return JSONResponse(content={"answer": ai_msg_1})
