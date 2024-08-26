@@ -4,15 +4,16 @@ from pydantic import BaseModel
 from typing import Optional
 from PIL import Image
 import pytesseract
+import pdfplumber
+import io
+from docx import Document as DocxDocument
 from langchain.docstore.document import Document
 from langchain_community.chat_models import ChatOllama
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.messages import HumanMessage
 from fastapi.middleware.cors import CORSMiddleware
-import io
-import os
-import requests
+import pypandoc
 
 app = FastAPI()
 
@@ -27,8 +28,8 @@ app.add_middleware(
 
 # Load the language model
 # local_llm = 'gemma'
-# local_llm = 'llama3'
-local_llm = 'llama3.1'
+local_llm = 'llama3'
+# local_llm = 'llama3.1'
 # local_llm = 'mistral'
 
 # --------linus
@@ -63,14 +64,53 @@ class QueryModel(BaseModel):
     question: str
     image: Optional[UploadFile] = None
 
-@app.post("/analyze-image/")
-async def analyze_image(question: str = Form(...), file: UploadFile = File(...)):
-    try:
-        # Load the image from the uploaded file
-        image = Image.open(io.BytesIO(await file.read()))
+# Function to extract text from an image
+def extract_text_from_image(image):
+    return pytesseract.image_to_string(image)
 
-        # Use Tesseract to extract text from the image
-        extracted_text = pytesseract.image_to_string(image)
+# Function to extract text from a PDF
+def extract_text_from_pdf(pdf_bytes):
+    with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
+        extracted_text = ""
+        for page in pdf.pages:
+            extracted_text += page.extract_text()
+    return extracted_text
+
+# Function to extract text from a DOCX file
+def extract_text_from_docx(docx_bytes):
+    doc = DocxDocument(io.BytesIO(docx_bytes))
+    extracted_text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+    return extracted_text
+
+# Function to extract text from a DOC file using pypandoc
+def extract_text_from_doc(doc_bytes):
+    with io.BytesIO(doc_bytes) as doc_file:
+        extracted_text = pypandoc.convert_file(doc_file.name, 'plain', format='doc')
+    return extracted_text
+
+@app.post("/analyze-file/")
+async def analyze_file(question: str = Form(...), file: UploadFile = File(...)):
+    try:
+        # Determine the file type by its content type
+        file_content_type = file.content_type
+
+        if file_content_type == "application/pdf":
+            # Extract text from PDF
+            pdf_bytes = await file.read()
+            extracted_text = extract_text_from_pdf(pdf_bytes)
+        elif "image" in file_content_type:
+            # Extract text from Image
+            image = Image.open(io.BytesIO(await file.read()))
+            extracted_text = extract_text_from_image(image)
+        elif file_content_type in ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword"]:
+            # Extract text from DOCX or DOC
+            doc_bytes = await file.read()
+            if file_content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                extracted_text = extract_text_from_docx(doc_bytes)
+            elif file_content_type == "application/msword":
+                extracted_text = extract_text_from_doc(doc_bytes)
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type. Please upload a PDF, image, or Word file.")
 
         # Create a context document from the extracted text
         context_document = Document(page_content=extracted_text)

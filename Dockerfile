@@ -62,3 +62,9 @@ EXPOSE 8000
 
 # Run the FastAPI server
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+
+
+# docker commad
+#docker build -t image_parser_llm .
+#docker run -d -p 8000:8000 --name image_parser_llm_container image_parser_llm
