@@ -39,13 +39,11 @@ local_llm = 'llama3'
 
 # --------mac
 # Load the language model
-llm = ChatOllama(model=local_llm, temperature=0, base_url="http://host.docker.internal:11434")
+llm = ChatOllama(model=local_llm, temperature=0, )
 
 # Define the QA prompt template
-qa_system_prompt = """You're a friendly expert in math and finance. Given the context, answer the question, and provide a clear, brief explanation afterward.
-Question: {input}
-Context: {context}
-Answer: assistant"""
+qa_system_prompt = """You're a friendly expert in math and finance. Given the context, answer the question, 
+and provide a clear, brief explanation afterward. Question: {input} Context: {context} Answer: assistant"""
 qa_prompt = ChatPromptTemplate.from_messages(
     [
         ("system", qa_system_prompt),
